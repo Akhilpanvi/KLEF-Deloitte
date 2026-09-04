@@ -1,0 +1,13 @@
+# Copy to `.dev.vars` for local dev (`wrangler dev`). Never commit `.dev.vars`.
+# In production set these as SECRETS, not plain vars:
+#   printf '<value>' | wrangler secret put <NAME>
+
+# Google Sheet — accepts a bare id or a full /spreadsheets/d/<id>/... URL.
+# Treat as a secret: anyone holding it can read the sheet directly.
+SHEET_ID=""
+
+# Password for the dashboard login screen.
+SITE_PASSWORD=""
+
+# Signing key for session cookies. Generate with: openssl rand -hex 32
+SESSION_SECRET=""

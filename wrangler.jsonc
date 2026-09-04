@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "eloitte-site",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-03",
+  "observability": {
+    "enabled": true
+  },
+  "routes": [
+    {
+      "pattern": "deloitte.klef.me/*",
+      "zone_name": "klef.me"
+    }
+  ]
+}
