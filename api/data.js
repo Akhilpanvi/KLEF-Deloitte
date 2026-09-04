@@ -1,2 +1,5 @@
-// /api/data is served by the same handler; it routes on the request pathname.
-export { default, config } from "./index.js";
+export const config = { runtime: "edge" };
+import { app } from "../lib/app.js";
+
+// Path is passed explicitly: Vercel rewrites do not preserve request.url.
+export default (request) => app(request, "/api/data");
