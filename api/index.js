@@ -1,5 +1,10 @@
+export const config = { runtime: "edge" };
+
 /**
  * Deloitte Campus Drive — Candidate Management & Interview Status Dashboard.
+ *
+ * Vercel Edge Function. vercel.json rewrites every path here, so this module
+ * routes on the original pathname.
  *
  * Rebuilds the Sheets Canvas dashboard as a password-gated site. Canvas tabs
  * cannot be published to the web, so this reads the underlying grid tabs and
@@ -31,7 +36,6 @@ const CSV = (id, sheet) =>
 
 const COOKIE = "dsess";
 const SESSION_MAX_AGE = 60 * 60 * 8; // 8 hours
-const SHEET_TTL = 3;                 // edge cache for the Google fetches
 const MODEL_TTL_MS = 2500;           // in-isolate cache of the built model
 
 /* ---------------------------------------------------------------- session */
@@ -100,7 +104,7 @@ function parseCSV(text) {
 }
 
 async function fetchTab(id, sheet) {
-  const res = await fetch(CSV(id, sheet), { cf: { cacheTtl: SHEET_TTL, cacheEverything: true } });
+  const res = await fetch(CSV(id, sheet), { cache: "no-store" });
   if (!res.ok) throw new Error(`"${sheet || "MASTER"}" fetch failed: ${res.status}`);
   return parseCSV(await res.text());
 }
@@ -854,9 +858,14 @@ const html = (body, status = 200, headers = {}) =>
 
 const cookie = (v, age) => `${COOKIE}=${v}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${age}`;
 
-export default {
-  async fetch(request, env) {
+export default async function handler(request) {
+  {
     const url = new URL(request.url);
+    const env = {
+      SITE_PASSWORD: process.env.SITE_PASSWORD,
+      SESSION_SECRET: process.env.SESSION_SECRET,
+      SHEET_ID: process.env.SHEET_ID,
+    };
     const { SITE_PASSWORD, SESSION_SECRET, SHEET_ID } = env;
     const missing = ["SITE_PASSWORD", "SESSION_SECRET", "SHEET_ID"].filter((k) => !env[k]);
     if (missing.length)
@@ -867,10 +876,15 @@ export default {
     try { SHEET = sheetId(SHEET_ID); }
     catch (err) { return html(`<h1>Not configured</h1><p>${esc(err.message)}</p>`, 500); }
 
-    if (url.pathname === "/logout" && request.method === "POST")
+    // vercel.json rewrites everything to this function; if the rewrite target
+    // leaks through instead of the original path, treat it as the root.
+    let path = url.pathname;
+    if (path === "/api" || path === "/api/index" || path === "/index") path = "/";
+
+    if (path === "/logout" && request.method === "POST")
       return html("", 302, { location: "/", "set-cookie": cookie("", 0) });
 
-    if (url.pathname === "/login" && request.method === "POST") {
+    if (path === "/login" && request.method === "POST") {
       const supplied = String((await request.formData()).get("password") || "");
       await new Promise((r) => setTimeout(r, 400)); // blunt brute force
       if (!timingSafeEqual(supplied, SITE_PASSWORD)) return html(loginPage("Incorrect password."), 401);
@@ -883,7 +897,7 @@ export default {
     if (!(await verifyToken(SESSION_SECRET, readCookie(request, COOKIE))))
       return html(loginPage(null), 401);
 
-    if (url.pathname === "/api/data") {
+    if (path === "/api/data") {
       try {
         const { body, tag } = await payload(SHEET);
         const base = { etag: tag, "cache-control": "no-store", "x-robots-tag": "noindex, nofollow" };
@@ -899,12 +913,12 @@ export default {
       }
     }
 
-    if (url.pathname !== "/") return html("<h1>404</h1>", 404);
+    if (path !== "/") return html("<h1>404</h1>", 404);
 
     try {
       return html(dashboard((await payload(SHEET)).model));
     } catch (err) {
       return html(`<h1>Could not load sheet</h1><p>${esc(err.message)}</p>`, 502);
     }
-  },
-};
+  }
+}

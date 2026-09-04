@@ -4,7 +4,7 @@ Password-gated dashboard for the Deloitte campus drive: candidate roster,
 attendance, slot progress, branch distribution and issue tracking, read live
 from Google Sheets.
 
-Runs as a single Cloudflare Worker. No build step, no dependencies.
+Runs as a single Vercel Edge Function. No build step, no dependencies.
 
 ## Why it reads the grid tabs
 
@@ -36,25 +36,28 @@ bypasses `SITE_PASSWORD` entirely.
 
 ### Deploy
 
+Add the three variables under **Project → Settings → Environment Variables**
+(Production, Preview and Development), then redeploy. Or from the CLI:
+
 ```bash
-npm install -g wrangler
-wrangler login
+npm i -g vercel
+vercel link
 
-printf '<sheet-id>'            | wrangler secret put SHEET_ID
-printf '<password>'            | wrangler secret put SITE_PASSWORD
-openssl rand -hex 32 | tr -d '\n' | wrangler secret put SESSION_SECRET
+vercel env add SHEET_ID production
+vercel env add SITE_PASSWORD production
+vercel env add SESSION_SECRET production   # openssl rand -hex 32
 
-wrangler deploy
+vercel --prod
 ```
 
-Set the custom domain via `routes` in `wrangler.jsonc`, or remove that block to
-deploy on a `*.workers.dev` subdomain.
+Env var changes only take effect on a **new deployment** — redeploy after
+adding them.
 
 ### Local development
 
 ```bash
-cp .dev.vars.example .dev.vars   # fill in the three values
-wrangler dev
+cp .env.example .env.local   # fill in the three values
+vercel dev
 ```
 
 ## How it works
@@ -67,8 +70,8 @@ wrangler dev
   place; filters, pagination, scroll and focus are preserved. ETag
   revalidation makes unchanged polls `304` with an empty body (~28ms).
 - **Caching** — the built payload is cached in-isolate for 2.5s and concurrent
-  misses collapse onto one build; Google fetches sit behind a 3s edge cache.
-  If Sheets errors, the last good payload is served rather than a 502.
+  misses collapse onto one build. If Sheets errors, the last good payload is
+  served rather than a 502.
 
 ## Routes
 
@@ -78,3 +81,7 @@ wrangler dev
 | `POST /login` | Verify password, issue session |
 | `POST /logout` | Clear session |
 | `GET /api/data` | JSON model for the poller; supports `If-None-Match` |
+
+`vercel.json` rewrites every path to `api/index.js`, which routes on the
+request pathname. `api/data.js` re-exports the same handler so `/api/data`
+also resolves as a filesystem route.

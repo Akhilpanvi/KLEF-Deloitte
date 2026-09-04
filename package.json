@@ -1,0 +1,7 @@
+{
+  "name": "klef-deloitte-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Password-gated campus drive dashboard, read live from Google Sheets."
+}

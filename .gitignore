@@ -1,11 +1,9 @@
 # Never commit: the sheet id grants access to candidate PII
-.dev.vars
 .env
 .env.*
 !.env.example
 
-.wrangler/
-.claude/
+.vercel/
 node_modules/
 *.log
 .DS_Store
